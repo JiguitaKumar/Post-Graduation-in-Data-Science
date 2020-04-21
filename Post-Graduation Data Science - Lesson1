@@ -85,3 +85,16 @@ import scipy.optimize as optimize
 
 func = lambda x : 5-x
 optimize.newton(func,x0=0)
+
+prices = []
+for y in yields:
+    prices.append(bondPrice(yld=y, maturity=3, coupon=coupon))
+prices
+
+yields_fromFunction = []
+for price in prices:
+    calculated_yield = bond_ytm(price, coupon, 3)
+    yields_fromFunction.append(round(calculated_yield, 2))
+yields_fromFunction
+
+yields
