@@ -26,7 +26,7 @@ y.sum(0)
 y.std(0)
 
 #6. Solve the following linear equations for 'a' and 'b'
-#2a+4b=9
+#2a+4b=9 
 #a−3b=2
 
 X = np.array([[2, 4], [1, -3]])
