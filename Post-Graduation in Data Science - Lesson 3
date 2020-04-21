@@ -1,0 +1,93 @@
+##Lesson 3
+
+#1. We need a DataFrame of dummy data
+#1.1. Generate a DataFrame called df with:
+# •250 rows
+# •A daily datarange index starting on 20.09.2018
+# •Column A: random numbers from 1 to 10 (hint: lookup the function np.random.randint)
+# •Column B: alternate values of 1 and 0
+
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({'A': np.random.randint(1, 10, 250),
+                  'B': [1, 0]*125},
+                  index=pd.date_range('2018-09-20', periods=250, freq='D')
+df.head()
+
+#1.2. Give the summary for the columns in the dataset
+df.describe()
+
+#1.3. Calculate standard deviation for all numeric columns
+df.std()
+
+#1.4. What are the mean values of the first 100 records in the dataset?
+df[:100].mean()
+
+#2. Titanic Dataset
+#2.1. Load the file 'titanic.csv' into a Pandas DataFrame called 'titanic'
+titanic = pd.read_csv("titanic.csv")
+titanic.head()
+
+#2.2. List column names
+titanic.columns
+
+#2.3. Check dataset dimensions.. how many row and columns?
+titanic.shape
+
+#2.4. Output general info about the dataset
+titanic.info()
+
+#2.5. Print the first 10 rows
+titanic.head(10)
+
+#2.6. How many people survived and what is the percentage?
+titanic.survived.sum()
+titanic.survived.sum() / len(titanic.survived)*100
+
+#2.7. Pivot Table with average survival per class
+titanic.pivot_table('survived', index='class')
+titanic.groupby('class')['survived'].mean()
+
+#2.8. How many children survived who are less than 5 years old?
+titanic[(titanic.age < 5) & (titanic.survived ==1)].shape
+
+#2.9. How many children below 5 years age were on board the ship?
+len(titanic[titanic.age < 5])
+
+#3. Financial Data
+#3.1. Import Dataset the apple stock timeseries
+apple = pd.read_csv("appl_1980_2014.csv")
+apple.head()
+
+#3.2. Check out the type of the columns
+apple.dtypes
+
+#3.3. Transform the Date column as a datetime type
+apple.Date = pd.to_datetime(apple.Date)
+apple.dtypes
+
+#3.4. Set the date as the index
+apple=apple.set_index('Date')
+apple.head()
+
+#3.5. Are there any duplicate dates?
+apple.index.is_unique
+
+#3.6. Reorder the index so that the first entry the oldest date
+apple=apple.sort_index(ascending=True)
+apple.head()
+
+#3.7. Resample and rename for 'monthly' by getting the last business day of each month
+apple_month = apple.resample('BM').mean()
+apple_month.head()
+
+#3.8. What is the difference in days between the first date and the oldest?
+(apple.index[-1] - apple.index[0]).days
+
+#3.9. How many months do we have in the data?
+len(apple_month)
+
+#Plot the 'Adj Close' value
+import matplotlib.pyplot as plt
+apple['Adj Close'].plot(title='Adj Close')
