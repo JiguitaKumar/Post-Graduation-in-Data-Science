@@ -1,0 +1,468 @@
+import numpy as np
+import pandas as pd
+
+#Step 1 - import the dataset
+
+dataset = pd.read_excel('Dataset.xlsx')
+dataset.head()
+
+#Step 2 - drop irrelevant columns and analyse the correlation between the remaining variables
+
+data = dataset.drop(['Year', 'Month', 'UniqueCarrier','Origin_City_Name','Departure_Time', 'Dep_Delay_Groups', 'Scheduled_Arrival', 'Arrival_Time',
+       'Arrival_Delay', 'Arr_Delay_Minutes', 'Arr_Del_morethan15', 'Cancelled','Diverted', 'DepDel15', 'DistanceGroup', 'Carrier_Delay','WeatherDelay',
+       'NAS_Delay', 'Security_Delay', 'Late_Aircraft_Delay','Top_Carriers', 'Top_Origin', 'DEPTIME_GROUP1', 'DEPTIME_GROUP2','DEPTIME_GROUP3','Flight_Date'], axis=1)
+data.head() 
+data.describe()
+df = pd.DataFrame(data)
+df.corr()
+
+#Step 3 - separate the data ("value") from the target (Dep_Delay = "targets")
+
+values_frame = data.loc[:, data.columns != 'Dep_Delay']
+values = values_frame.values
+values
+
+targets = data.Dep_Delay.values
+targets
+
+#Step 4 - convert variables that are in different forms (text, date, etc) into numerical variables
+
+values[:, 2]
+values[:, 5]
+
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+labelencoder_X_1 = LabelEncoder()
+values[:, 2] = labelencoder_X_1.fit_transform(values[:, 2])
+labelencoder_X_2 = LabelEncoder()
+values[:, 4] = labelencoder_X_2.fit_transform(values[:, 4])
+labelencoder_X_3 = LabelEncoder()
+values[:, 5] = labelencoder_X_3.fit_transform(values[:, 5])
+values[:, 2]
+
+xxx = pd.DataFrame(values)
+xxx.head()
+values[:, 6]
+
+#Step 5 - One Hot Encoder (ver quais são as variáveis que queremos transformar)
+#The problem here is, since there are different numbers in the same column, the model will misunderstand the data to be in some kind of order, 0 < 1 < 2. But this isn’t the case at all. To overcome this problem, we use One Hot Encoder.
+
+onehotencoder = OneHotEncoder(categorical_features = [0,1,2,3,4,5,6])
+X = onehotencoder.fit_transform(values).toarray()
+
+ggg = pd.DataFrame(X)
+ggg.head()
+
+X.shape
+
+#Step 6 - Randomly Shuffle the data to avoid patterns
+np.random.shuffle(X)
+
+#Step 7 - Splitting the dataset into the Training set and Test set
+from sklearn.model_selection import train_test_split
+X_train, X_test, targets_train, targets_test = train_test_split(X, targets, test_size = 0.2, random_state = 0)
+
+# Step 8 - Feature Scaling (should only be done after splitting not to temper with the test set)
+#fit the scaler on your training data only, then standardise both training and test sets with that scaler. By fitting the scaler on the full dataset prior to splitting, information about the test set is used to transform the training set, which in turn is passed downstream.
+#What StandardScaler does is Standardize features by removing the mean and scaling to unit variance. So we're normalizing the data (the many variables have different scales, some are Binary, other can go from 1 to 7, etc)
+
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+
+#Step 9 - Transform the targets to have a similar scale (they're not take into consideration when defining the scale)
+X_test = sc.transform(X_test)
+
+#Step 10 - Creating the model (we'll start with 2 layers + 1 output layer, 320 neurals)
+import keras
+from keras import layers
+from keras.layers import Dense
+from keras import models
+from keras.models import Sequential
+
+model = Sequential() #the empty model / arquitecture / topology
+
+model.add(Dense(320, activation='relu', input_dim=966)) #layer 1 - the layer that receives de input
+#we're using relu as we're only interested in positive results. Relu returns zero when the output is negative
+#as we're not interest in flights that departed earlier than the departure time
+
+model.add(Dense(320, activation='relu')) #layer 2
+
+model.add(Dense(1)) #layer 3 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+
+model.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+
+# we chose to use the mse loss function as we're interested in analyzing the square of the difference 
+# between the predictions and the targets.
+
+# the metrics used is mae - mean absolute error 
+# The absolute difference between the prediction and the target
+
+#Step 11 - Validation, as our dataset comprises a total of 4821 observation and our X_train has 3856
+#we will not reccur to K-fold to create our validation set, we will simply split the train data (of 700 obs. ~15%)
+
+len(X_train)
+
+X_val = X_train[:700]
+partial_X_train = X_train[700:]
+targets_val = targets_train[:700]
+partial_targets_train = targets_train[700:]
+
+#Step 12 - Train the final model. Train the model in the entire train data.
+#once we're doing a 100 iterations (epochs) we will use verbose to silent the proccess
+
+History = model.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+
+#Step 13 - evaluate the final result (get the mse - mean square error and the mae - mean absolute error)
+test_mse_score, test_mae_score = model.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score, "minutes")
+
+#Step 14 - Plot the results for Loss and MAE
+
+import matplotlib.pyplot as plt
+loss = History.history['loss']
+val_loss = History.history['val_loss']
+epochs = range(1, len(loss) + 1)
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+mae = History.history['mean_absolute_error']
+val_mae = History.history['val_mean_absolute_error']
+epochs = range(1, len(mae) + 1)
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, mae, 'bo', label='Training mae')
+plt.plot(epochs, val_mae, 'b', label='Validation mae')
+plt.title('Training and validation mae')
+plt.xlabel('Epochs')
+plt.ylabel('MAE')
+plt.legend()
+plt.show()
+
+#Step 14.1 omit the first 40 epochs to better understand the performance of the model towards de end
+epochs_1 = range(40, len(mae))
+mae_1 = mae[40:]
+plt.plot(epochs_1, mae_1)
+plt.xlabel('Epochs')
+plt.ylabel('Validation MAE')
+plt.show()
+
+#Step 15 - Using weight regulators (L2)
+from keras import regularizers
+
+model_reg = models.Sequential()
+model_reg.add(Dense(320, kernel_regularizer=regularizers.l2(0.001), activation='relu', input_dim=966))
+model_reg.add(Dense(320, kernel_regularizer=regularizers.l2(0.001), activation='relu'))
+model_reg.add(Dense(1))
+model_reg.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+
+History_reg = model_reg.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+
+val_loss = History.history['val_loss']
+val_loss_reg = History_reg.history['val_loss']
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, val_loss, 'b', label='Original loss')
+plt.plot(epochs, val_loss_reg, 'r', label='Regularized loss (L2)')
+plt.title('Original and Regularized Validation loss (L2)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+epochs_1 = range(20, len(val_loss))
+val_loss_20 = val_loss[20:]
+val_loss_reg_20 = val_loss_reg[20:]
+plt.plot(epochs_1, val_loss_20, 'b', label='Original loss')
+plt.plot(epochs_1, val_loss_reg_20, 'r', label='Regularized loss (L2)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+test_mse_score_reg, test_mae_score_reg = model_reg.evaluate(X_test, targets_test)
+test_mae_score_reg
+
+#Step 16 - Using weight regulators (L1)
+model_reg1 = models.Sequential()
+model_reg1.add(Dense(320, kernel_regularizer=regularizers.l1(0.001), activation='relu', input_dim=966))
+model_reg1.add(Dense(320, kernel_regularizer=regularizers.l1(0.001), activation='relu'))
+model_reg1.add(Dense(1))
+model_reg1.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+
+History_reg1 = model_reg1.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+
+val_loss = History.history['val_loss']
+val_loss_reg1 = History_reg1.history['val_loss']
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, val_loss, 'b', label='Original loss')
+plt.plot(epochs, val_loss_reg1, 'r', label='Regularized loss (L1)')
+plt.title('Original and Regularized Validation loss (L1)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+epochs_1 = range(20, len(val_loss))
+val_loss_20 = val_loss[20:]
+val_loss_reg1_20 = val_loss_reg1[20:]
+plt.plot(epochs_1, val_loss_20, 'b', label='Original loss')
+plt.plot(epochs_1, val_loss_reg1_20, 'r', label='Regularized loss (L1)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+test_mse_score_reg1, test_mae_score_reg1 = model_reg1.evaluate(X_test, targets_test)
+test_mae_score_reg1
+
+#Step 17 - Using weight regulators (L1 and L2)
+model_reg12 = models.Sequential()
+model_reg12.add(Dense(320, kernel_regularizer=regularizers.l1_l2(l1=0.001, l2=0.001), activation='relu', input_dim=966))
+model_reg12.add(Dense(320, kernel_regularizer=regularizers.l1_l2(l1=0.001, l2=0.001), activation='relu'))
+model_reg12.add(Dense(1))
+model_reg12.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+
+History_reg12 = model_reg12.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+
+val_loss = History.history['val_loss']
+val_loss_reg12 = History_reg12.history['val_loss']
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, val_loss, 'b', label='Original loss')
+plt.plot(epochs, val_loss_reg12, 'r', label='Regularized loss (L1 and L2)')
+plt.title('Original and Regularized Validation loss (L1 and L2)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+epochs_1 = range(20, len(val_loss))
+val_loss_20 = val_loss[20:]
+val_loss_reg12_20 = val_loss_reg12[20:]
+plt.plot(epochs_1, val_loss_20, 'b', label='Original loss')
+plt.plot(epochs_1, val_loss_reg12_20, 'r', label='Regularized loss (L1 and L2)')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+test_mse_score_reg12, test_mae_score_reg12 = model_reg12.evaluate(X_test, targets_test)
+test_mae_score_reg12
+
+#Step 18 - Adding dropouts
+#consists of randomly dropping out (setting to zero) a number of output features of the layer during training
+
+model_drop = Sequential()
+model_drop.add(Dense(320, kernel_initializer='uniform', activation='relu', input_dim=966))
+model.add(layers.Dropout(0.5))
+model_drop.add(Dense(320, kernel_initializer='uniform', activation='relu'))
+model.add(layers.Dropout(0.5))
+model_drop.add(Dense(1, kernel_initializer='uniform'))
+model_drop.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+
+History_drop = model_drop.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+
+test_mse_score_drop, test_mae_score_drop = model_drop.evaluate(X_test, targets_test)
+test_mae_score_drop
+
+val_loss = History.history['val_loss']
+val_loss_drop = History_drop.history['val_loss']
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, val_loss, 'b', label='Original loss')
+plt.plot(epochs, val_loss_drop, 'r', label='Dropout loss')
+plt.title('Original and Dropout Validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+epochs_1 = range(20, len(val_loss))
+val_loss_20 = val_loss[20:]
+val_loss_drop_20 = val_loss_drop[20:]
+plt.plot(epochs_1, val_loss_20, 'bo', label='Original loss')
+plt.plot(epochs_1, val_loss_drop_20, 'ro', label='Dropout loss')
+plt.xlabel('Epochs')
+plt.ylabel('Validation loss')
+plt.legend()
+plt.show()
+
+#Step 19 - Tuning of the parameters
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import GridSearchCV
+
+def build_classifier(optimizer):
+    classifier = Sequential()
+    classifier.add(Dense(320, kernel_initializer='uniform', activation='relu', input_dim=966))
+    classifier.add(Dense(320, kernel_initializer='uniform', activation='relu'))
+    classifier.add(Dense(1, kernel_initializer='uniform'))
+    classifier.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
+    return classifier
+classifier = KerasClassifier(build_fn = build_classifier)
+
+parameters = {'batch_size': [10, 312], 'epochs': [50, 100, 320], 'optimizer': ['rmsprop']}
+
+grid_search = GridSearchCV(estimator = classifier, param_grid = parameters, scoring = 'neg_mean_absolute_error', cv = 10)
+
+grid_search = grid_search.fit(X_train, targets_train)
+
+#Step 20 - Test different numbers of neurals and layers
+#Test with 3 layers and 512 neurals
+model_1 = Sequential()
+model_1.add(Dense(512, activation='relu', input_dim=966))
+model_1.add(Dense(512, activation='relu')) #layer 2
+model_1.add(Dense(1)) #layer 3 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_1.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_1 = model_1.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_1, test_mae_score_1 = model_1.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_1, "minutes")
+
+#Test with 3 layers and 1024 neurals
+model_2 = Sequential()
+model_2.add(Dense(1024, activation='relu', input_dim=966))
+model_2.add(Dense(1024, activation='relu')) #layer 2
+model_2.add(Dense(1)) #layer 3 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_2.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_2 = model_2.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_2, test_mae_score_2 = model_2.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_2, "minutes")
+
+#Test with 3 layers and 32 neurals
+model_3 = Sequential()
+model_3.add(Dense(32, activation='relu', input_dim=966))
+model_3.add(Dense(32, activation='relu')) #layer 2
+model_3.add(Dense(1)) #layer 3 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_3.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_3 = model_3.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_3, test_mae_score_3 = model_3.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_3, "minutes")
+
+#Test with 3 layers and 112 neurals
+model_4 = Sequential()
+model_4.add(Dense(112, activation='relu', input_dim=966))
+model_4.add(Dense(112, activation='relu')) #layer 2
+model_4.add(Dense(1)) #layer 3 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_4.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_4 = model_4.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_4, test_mae_score_4 = model_4.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_4, "minutes")
+
+#Test with 4 layers and 320 neurals
+model_5 = Sequential()
+model_5.add(Dense(320, activation='relu', input_dim=966))
+model_5.add(Dense(320, activation='relu')) #layer 2
+model_5.add(Dense(320, activation='relu')) #layer 3
+model_5.add(Dense(1)) #layer 4 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_5.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_5 = model_5.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_5, test_mae_score_5 = model_5.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_5, "minutes")
+
+#Test with 4 layers and 112 neurals
+model_6 = Sequential()
+model_6.add(Dense(112, activation='relu', input_dim=966))
+model_6.add(Dense(112, activation='relu')) #layer 2
+model_6.add(Dense(112, activation='relu')) #layer 3
+model_6.add(Dense(1)) #layer 4 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_6.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_6 = model_6.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_6, test_mae_score_6 = model_6.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_6, "minutes")
+
+#Test with 2 layers and 320 neurals
+model_7 = Sequential()
+model_7.add(Dense(320, activation='relu', input_dim=966))
+model_7.add(Dense(1)) #layer 2 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_7.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_7 = model_7.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_7, test_mae_score_7 = model_7.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_7, "minutes")
+
+#Test with 5 layers and 320 neurals
+model_8 = Sequential()
+model_8.add(Dense(320, activation='relu', input_dim=966))
+model_8.add(Dense(320, activation='relu')) #layer 2
+model_8.add(Dense(320, activation='relu')) #layer 3
+model_8.add(Dense(320, activation='relu')) #layer 4
+model_8.add(Dense(1)) #layer 5 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_8.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_8 = model_8.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_8, test_mae_score_8 = model_8.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_8, "minutes")
+
+#To check if we have overfit in the last model tested
+loss_8 = History_8.history['loss']
+val_loss_8 = History_8.history['val_loss']
+epochs = range(1, len(loss_8) + 1)
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, loss_8, 'bo', label='Training loss')
+plt.plot(epochs, val_loss_8, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+epochs_8 = range(20, 100)
+val_loss_81 = val_loss_8[20:]
+plt.plot(epochs_8, val_loss_81)
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.show()
+
+#Test with 5 layers and 320/160/80 neurals
+model_9 = Sequential()
+model_9.add(Dense(320, activation='relu', input_dim=966))
+model_9.add(Dense(160, activation='relu')) #layer 2
+model_9.add(Dense(80, activation='relu')) #layer 3
+model_9.add(Dense(32, activation='relu')) #layer 4
+model_9.add(Dense(1)) #layer 5 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_9.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_9 = model_9.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_9, test_mae_score_9 = model_9.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_9, "minutes")
+
+#Test with 6 layers and 320 neurals
+model_10 = Sequential()
+model_10.add(Dense(320, activation='relu', input_dim=966))
+model_10.add(Dense(320, activation='relu')) #layer 2
+model_10.add(Dense(320, activation='relu')) #layer 3
+model_10.add(Dense(320, activation='relu')) #layer 4
+model_10.add(Dense(1)) #layer 5 - the layer that delivers the output, we don't have an activation in this layer once we want a linear to be purely linear
+model_10.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+History_10 = model_10.fit(X_train, targets_train, batch_size = 10, epochs = 100, validation_data=(X_val, targets_val), verbose=0)
+test_mse_score_10, test_mae_score_10 = model_10.evaluate(X_test, targets_test)
+print ("Our predictions have an mean absolute error of:", test_mae_score_10, "minutes")
+
+#To check if we have overfit in the last model tested
+loss_10 = History_10.history['loss']
+val_loss_10 = History_10.history['val_loss']
+epochs = range(1, len(loss_10) + 1)
+plt.figure(figsize=((6,4)))
+plt.plot(epochs, loss_10, 'bo', label='Training loss')
+plt.plot(epochs, val_loss_10, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+epochs_10 = range(20, 100)
+val_loss_101 = val_loss_10[20:]
+plt.plot(epochs_10, val_loss_101)
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.show()
+
+#Step 21 - Callback
+
+allbacks_list = [keras.callbacks.EarlyStopping(monitor = 'mae', patience = 1), 
+                  keras.callbacks.ModelCheckpoint(filepath = 'model_call.h5', monitor = 'val_loss', save_best_only = True)] 
+                  
+model.compile(optimizer = 'rmsprop', loss = 'mse', metrics = ['mae'])
+model.fit(X_train, targets_train, epochs = 100, batch_size = 10, callbacks = callbacks_list, validation_data=(X_val, targets_val))
+
+model.compile(optimizer = 'rmsprop', loss = 'mse', metrics = ['mae'])
+model.fit(X_train, targets_train, epochs = 200, batch_size = 10, callbacks = callbacks_list, validation_data=(X_val, targets_val))
