@@ -1,0 +1,100 @@
+## Lesson 4
+
+#Pivot Tables
+
+import pandas as pd
+import seaborn as sns
+
+titanic = sns.load_dataset('titanic')
+titanic.describe()
+
+#Create Pivot tables Manually
+
+titanic.groupby('sex')[['survived']].mean()
+titanic.groupby(['sex', 'class'])['survived'].aggregate('mean').unstack()
+
+#Pandas pivot table
+
+titanic.pivot_table('survived', index='sex')
+titanic.pivot_table('survived', index='sex', columns='class')
+
+age = pd.qcut(titanic['age'], 2)
+titanic.pivot_table('survived', ['sex', age], 'class')
+
+fare = pd.qcut(titanic['fare'], 2)
+titanic.pivot_table('survived', ['sex', age], [fare, 'class'])
+
+titanic.pivot_table(index='sex', columns='class',
+                    aggfunc={'survived':sum, 'fare':'mean'})
+
+titanic.pivot_table('survived', index='sex', columns='class', margins=True)
+
+#High Frequency Time Series
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+range = pd.date_range('2017-01-01', '2017-12-31', freq='15min')
+df = pd.DataFrame(index = range)
+df.shape
+
+df['speed'] = np.random.randint(low=0, high=60, size=len(df.index)) # Average speed in miles per hour
+df['distance'] = df['speed'] * 0.25  # Distance in miles (speed * 0.5 hours)
+df['cumulative_distance'] = df.distance.cumsum() # Cumulative distance travelled
+df.head()
+
+weekly_summary = pd.DataFrame()
+weekly_summary['speed'] = df.speed.resample('W').mean()
+weekly_summary['distance'] = df.distance.resample('W').sum()
+weekly_summary['cumulative_distance'] = df.cumulative_distance.resample('W').last()
+
+#Select only whole weeks
+weekly_summary = weekly_summary.truncate(before='2017-01-05', after='2017-12-27')
+weekly_summary.head()
+
+fig, ax1 = plt.subplots()
+ax1.plot(weekly_summary.index, weekly_summary['distance'], 'b-')
+ax1.set_xlabel('Date')
+ax1.set_ylabel('Distance', color='b')
+plt.show()
+
+annual_summary = pd.DataFrame()
+# AS is year-start frequency
+annual_summary['speed'] = df.speed.resample('AS').mean()
+annual_summary['distance'] = df.speed.resample('AS').sum()
+annual_summary['cumulative_distance'] = df.cumulative_distance.resample('AS').last()
+annual_summary
+
+#Upsampling data
+
+five_minutely_data = pd.DataFrame()
+five_minutely_data['speed'] = df.speed.resample('5min').ffill()
+# 5 minutes is 1/12 hours
+five_minutely_data['distance'] = five_minutely_data['speed'] * (1/float(12))
+five_minutely_data['cumulative_distance'] = five_minutely_data.distance.cumsum()
+five_minutely_data.head()
+
+#Financial Data
+
+import pandas as pd
+import numpy as np
+import datetime as dt
+%matplotlib inline
+
+# data from FXCM Forex Capital Markets Ltd.
+eur_usd = pd.read_csv('fxcm_eur_usd_tick_data.csv',
+                     index_col=0, parse_dates=True)
+eur_usd.head()
+
+eur_usd['Mid'] = eur_usd.mean(axis=1)
+eur_usd.Mid.plot()
+eur_usd.head()
+
+# Using last
+eur_usd_resam = eur_usd.resample('1min').last()
+eur_usd_resam.head()
+
+ohlc_data =  eur_usd['Mid'].resample('5Min').ohlc()
+ohlc_data.head()
