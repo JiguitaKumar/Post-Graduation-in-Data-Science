@@ -1,0 +1,87 @@
+## Lecture 1
+
+# 1. Define a value of an integer, a float, a boolean and a string a the variables a,b,c,d respectively
+a=1
+b=1.2
+c=True
+d="Bye"
+
+#2. Assign the values of 1, 2, 3, 4 to variables a,b,c and d, all on the same line of code
+x,y,z=1,2,3
+
+# 3. Display the helpfile of the function range
+help(range)
+
+#4. Print all the numbers from 4 to 20 with a for loop
+list(range(4,21))
+
+#5. Create a list named 'x' containing number all even number between 9 to 17 inclusive
+#Manually
+x=[10,12,14,16]
+
+#USing a Loop
+x=[]
+for n in range (9,17):
+    if n %2==0:
+        x.append(n)
+print(x)
+
+#Using List Comprehension
+x = [n for n in range(9,17) if n%2==0]
+print(x)
+
+#6. Extract the 2nd and 3rd element of the list you created
+x[1:3]
+
+#7. Get the last element of that list
+X[-1]
+
+#8. Define a function to print a string as an argument
+def f(string):
+    """ A Function to print something """
+    print(string)
+    
+f("Hello")
+
+#9. Write a function that takes a number as input and returns "Hello" if the number is 0, "Greeings" if the number is between 3 and 7, and "Bye" otherwise
+def f1(myNumber):
+    if myNumber == 0:
+        return "Hello"
+    elif myNumber > 3 and myNumber < 7:
+        return "Greetings"
+    else:
+        return "Bye"
+
+a=f1(5)
+print(a)
+
+#10. Write a function to return a price of a bond w ith arguments maturity, coupon and yield
+couprate=0.05
+Maturity=3
+yld=0.05
+Notional=100
+Coupon=couprate*Notional
+print(Coupon)
+
+#Manual
+bondPrice=Coupon/(1+yld)+Coupon/((1+yld)**2)+(Coupon+Notional)/((1+yld)**3)
+print(bondPrice)
+
+#with formula
+def Bondpric (coupo=5, maturit=3, yild=0.05):
+          
+    price=coupo/(1+yild)+coupo/((1+yild)**2)+(coupo+100)/((1+yild)**maturit)
+    return price
+
+print(Bondpric())   
+
+#With loop
+cfs=[(Coupon if n < 3 else Coupon + Notional)/(1+yld)**n
+    for n in range(1,4)]
+sum(cfs)
+
+#11. Write a function to return the yield of a bond with arguments maturity, coupon and price
+import scipy.optimize as optimize
+
+func = lambda x : 5-x
+optimize.newton(func,x0=0)
