@@ -1,0 +1,108 @@
+##Lesson 2
+
+#1. Create a 4x4 array called 'x' with integers from 1 to 16
+#1.1. Manually by inputting a list
+import numpy as np
+x = np.array([[1,2,3,4], [5,6,7,8], [9,10,11,12], [13,14,15,16]])
+x
+
+#1.2. Using the np.arange function
+x = np.arange(1, 17).reshape(4,4)
+x
+
+#2. Save the array to a file calle 'file.csv'
+np.savetxt('file.csv', x)
+
+#3. Load the data from 'file.csv' to a variable called 'y'
+y = np.loadtxt("file.csv")
+y
+
+#4. Calculate the sum and standard deviation of each row
+y.sum(1)
+y.std(1)
+
+#5. Calculate the sum and standard deviation of each column
+y.sum(0)
+y.std(0)
+
+#6. Solve the following linear equations for 'a' and 'b'
+#2a+4b=9
+#a−3b=2
+
+X = np.array([[2, 4], [1, -3]])
+y = np.array([9, 2])
+
+#6.1. Using a Numpy function
+result = np.linalg.solve(X, y)
+result
+
+#6.2. Using matrix maths
+result = np.linalg.inv(X) @ y
+result
+
+#7. Bond Bootstrapping
+#7.1. Load the file 'ex2_bonds.txt' into an array called bonds and display it
+# •The file 'ex2_bonds.txt' contains the market information for 10 bonds.
+# •Each bond is a row
+# •Each row has 3 columns (maturity, price and coupon)
+
+bonds = np.loadtxt("ex2_bonds.txt")
+bonds
+
+#7.2. Construct a 10x10 array with the cash flows of the bonds
+#Each row is a bond and each column is a year
+
+maturities, prices, coupons = bonds[:, 0], bonds[:, 1], bonds[:, 2]
+years = len(prices)
+
+cfs = ([[(coupon if year < maturity else coupon + 100 if year == maturity else 0)
+        for year in range(years)] for maturity, coupon in enumerate(coupons)])
+cfs
+
+#7.3. Knowing that the price of a bond formulas
+#Determine the zero rate and discount factors for each of the 10 years
+#Manually
+
+dfs = np.zeros(10)
+for bond in bonds:
+    maturity, price, coupon = bond
+    maturity = int(maturity)
+    df = (price - sum(coupon*dfs[:maturity-1]))/(coupon+100)
+    dfs[maturity-1] = df
+dfs
+
+zeros = (1/dfs)**(1/maturities)-1
+zeros
+
+#Using Linear Algebra
+
+dfs1 = np.linalg.inv(cfs) @ prices
+dfs1
+
+#7.4. Use the Yield to maturity function you created in the last lecture to get the yield of each bond
+import scipy.optimize as optimize
+yields = []
+
+def Bondyld(maturity, price, coupon):
+    func_ytm = lambda y: sum(((coupon if n < maturity else coupon + 100)/(1+ y)**n)
+                              for n in range(1, maturity+1)) - price
+    return optimize.newton(func_ytm, 0)
+
+Bondyld(int(maturity), price, coupon)
+
+for bond in bonds:
+    maturity, price, coupon = bond
+    yields.append(Bondyld(int(maturity), price, coupon))
+
+yields
+
+#7.5. Use the numpy irr function to determine the yield of each bond
+data = np.column_stack([-prices, cfs])
+yields1 = [np.irr(bonds) for bonds in data]
+yields1
+
+#7.6. Plot both yield and zero rate
+import matplotlib.pyplot as plt
+plt.plot(yields, label="Yields")
+plt.plot(zeros, label="Zero Rate")
+plt.legend()
